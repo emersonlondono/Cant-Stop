@@ -1,0 +1,305 @@
+#include <iostream>
+#include <map>
+#include <string>
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+#include <iomanip> // Para ajustar el formato de salida
+
+using namespace std;
+
+class celda {
+public:
+    int valor;
+    char ficha;
+
+    celda(int _valor) : valor(_valor), ficha(' ') {}
+    //valor: el número que indica la columna (2 a 12).
+    //ficha: el carácter de la ficha colocada (o un espacio en blanco si no hay ficha)
+
+    void colocarFicha(char nuevaFicha) {
+        ficha = nuevaFicha;
+    }
+
+    void limpiarFicha() {
+        ficha = ' ';
+    }
+
+    void mostrar() {
+        if (ficha != ' ') {
+            cout << setw(3) << ficha << "|";
+        } else {
+            cout << setw(3) << valor << "|";
+            //setw: establecer el ancho del flujo de entrada-salida
+        }
+    }
+};
+
+class tablero {
+private:
+    int guia[11] = {3, 5, 7, 9, 11, 13, 11, 9, 7, 5, 3};
+    //Guia 11:  define la cantidad de celdas en cada columna
+    string rotulo[11] = {"2 : ", "3 : ", "4 : ", "5 : ", "6 : ", "7 : ", "8 : ", "9 : ", "10: ", "11: ", "12: "};
+    //Es un arreglo de cadenas que contiene el nombre de cada columna
+    vector<vector<celda>> columnas;
+
+public:
+    tablero() {
+        for (int i = 0; i < 11; i++) {
+            vector<celda> columna;
+            for (int j = 0; j < guia[i]; j++) {
+                columna.emplace_back(i + 2);
+                //evitan copias o movimientos innecesarios de los elementos
+            }
+            columnas.push_back(columna);
+            // permite añadir al final de la colección un nuevo dato.
+        }
+    }
+
+    void mostrar() {
+        cout << "                                 TABLERO" << endl;
+        for (int i = 0; i < 11; i++) {
+            cout << rotulo[i];
+            //se utiliza para imprimir el nombre de la columna correspondiente en cada ciclo del bucle
+            for (int k = 0; k < ((13 - guia[i]) / 2); k++) {
+                cout << "     ";
+            }
+            cout << "|";
+            for (celda& celda : columnas[i]) {
+                celda.mostrar();
+            }
+            cout << endl;
+        }
+    }
+
+    void colocarFicha(int columna, int posicion, char ficha) {
+        int indiceColumna = columna - 2;
+        if (indiceColumna >= 0 && indiceColumna < 11 && posicion >= 0 && posicion < guia[indiceColumna]) {
+            columnas[indiceColumna][posicion].colocarFicha(ficha);
+        }
+    }
+
+    void limpiarFicha(int columna, int posicion) {
+        int indiceColumna = columna - 2;
+        if (indiceColumna >= 0 && indiceColumna < 11 && posicion >= 0 && posicion < guia[indiceColumna]) {
+            columnas[indiceColumna][posicion].limpiarFicha();
+        }
+    }
+
+    int obtenerTamanoColumna(int columna)  {
+        return guia[columna - 2];
+    }
+};
+
+class jugador {
+private:
+    string nombre;
+    map<int, int> posiciones;
+    int fichasActivas;
+
+public:
+    jugador(string _nombre) : nombre(_nombre), fichasActivas(0) {
+        for (int i = 2; i <= 12; i++) {
+            posiciones[i] = -1;
+        }
+    }
+
+    string obtenerNombre()  {
+        return nombre;
+    }
+
+    int obtenerPosicion(int columna)  {
+        return posiciones.at(columna);
+    }
+
+    bool puedeAgregarFicha()  {
+        return fichasActivas < 3;
+    }
+
+    void agregarFicha(int columna) {
+        if (posiciones[columna] == -1) {
+            fichasActivas++;
+        }
+    }
+
+    void moverFicha(int columna, int avance) {
+        posiciones[columna] += avance;
+        if (posiciones[columna] == 0) {
+            agregarFicha(columna);
+        }
+    }
+
+    void guardarPosiciones(tablero &t) {
+        for (auto& pos : posiciones) {
+            if (pos.second >= 0) {
+                t.colocarFicha(pos.first, pos.second, nombre[0]);
+            }
+        }
+        fichasActivas = 0;
+    }
+
+    bool puedeMoverFicha(int columna) {
+        return posiciones[columna] != -1;
+    }
+
+    void perderProgreso() {
+        for (auto& pos : posiciones) {
+            pos.second = -1;
+        }
+        fichasActivas = 0;
+    }
+};
+
+class dado {
+private:
+    int valor;
+
+public:
+    dado() {
+        lanzar();
+    }
+
+    void lanzar() {
+        valor = rand() % 6 + 1;
+    }
+
+    int obtenerValor() const {
+        return valor;
+    }
+
+    void mostrar(int numero) const {
+        cout << "Dado " << numero << ": " << valor << endl;
+    }
+};
+
+void iniciarJuego() {
+    srand(time(0));
+
+    int cantidadJugadores;
+    cout << "Ingrese la cantidad de jugadores (2-4): ";
+    cin >> cantidadJugadores;
+    while (cantidadJugadores < 2 || cantidadJugadores > 4) {
+        cout << "Cantidad inválida. Ingrese la cantidad de jugadores (2-4): ";
+        cin >> cantidadJugadores;
+    }
+
+    tablero t;
+    vector<jugador> jugadores;
+    for (int i = 1; i <= cantidadJugadores; i++) {
+        string nombre;
+        cout << "Ingrese el nombre del jugador " << i << ": ";
+        cin >> nombre;
+        jugadores.emplace_back(nombre);
+    }
+
+    dado d1, d2, d3, d4;
+    int turno = 0;
+    char continuar = 's';
+
+    while (true) {
+        jugador& jugadorActual = jugadores[turno];
+        cout << "\nEs el turno de " << jugadorActual.obtenerNombre() << endl;
+
+        bool seguirLanzando = true;
+        while (seguirLanzando) {
+            d1.lanzar();
+            d2.lanzar();
+            d3.lanzar();
+            d4.lanzar();
+            d1.mostrar(1);
+            d2.mostrar(2);
+            d3.mostrar(3);
+            d4.mostrar(4);
+
+            int par1, par2, op;
+            cout << "¿Qué parejas de dados quieres sumar?" << endl;
+            cout << "1. Dado 1 + Dado 2 y Dado 3 + Dado 4" << endl;
+            cout << "2. Dado 1 + Dado 3 y Dado 2 + Dado 4" << endl;
+            cout << "3. Dado 1 + Dado 4 y Dado 2 + Dado 3" << endl;
+            cin >> op;
+
+            switch (op) {
+                case 1:
+                    par1 = d1.obtenerValor() + d2.obtenerValor();
+                    par2 = d3.obtenerValor() + d4.obtenerValor();
+                    break;
+                case 2:
+                    par1 = d1.obtenerValor() + d3.obtenerValor();
+                    par2 = d2.obtenerValor() + d4.obtenerValor();
+                    break;
+                case 3:
+                    par1 = d1.obtenerValor() + d4.obtenerValor();
+                    par2 = d2.obtenerValor() + d3.obtenerValor();
+                    break;
+                default:
+                    cout << "Opción inválida." << endl;
+                    continue;
+            }
+
+            bool fichaMovida = false;
+            for (int par : {par1, par2}) {
+                if (jugadorActual.puedeAgregarFicha()) {
+                    int posicionActual = jugadorActual.obtenerPosicion(par);
+                    t.limpiarFicha(par, posicionActual);
+                    jugadorActual.moverFicha(par, 1);
+                    int nuevaPosicion = jugadorActual.obtenerPosicion(par);
+                    t.colocarFicha(par, nuevaPosicion, jugadorActual.obtenerNombre()[0]);
+                    fichaMovida = true;
+                }
+            }
+
+            t.mostrar();
+
+            if (!fichaMovida) {
+                cout << "No se pudo mover ninguna ficha. Has perdido tu progreso." << endl;
+                jugadorActual.perderProgreso();
+                seguirLanzando = false;
+                break;
+            }
+
+            cout << "¿Quieres seguir lanzando dados? (s/n): ";
+            cin >> continuar;
+            if (continuar == 'n' || continuar == 'N') {
+                jugadorActual.guardarPosiciones(t);
+                seguirLanzando = false; // Pasar al siguiente jugador
+            }
+        }
+
+        turno = (turno + 1) % cantidadJugadores; // Cambiar turno automáticamente
+    }
+
+    cout << "Fin del juego" << endl;
+}
+
+int main() {
+    int op;
+    do {
+        cout << "\n-------------------------------BIENVENIDO-----------------------------";
+        cout << "\nMenu de opciones:" << endl;
+        cout << "1 : Reglas" << endl;
+        cout << "2 : Jugar" << endl;
+        cout << "3 : Salir" << endl;
+        cout << "Ingrese una opción: ";
+        cin >> op;
+
+        switch (op) {
+            case 1:
+                cout << "Reglas del juego:\n";
+                cout << "1. Cada jugador intenta completar 3 columnas para ganar.\n";
+                cout << "2. Los jugadores lanzan 4 dados y eligen cómo combinarlos en pares.\n";
+                cout << "3. Avanzan fichas en las columnas y pueden decidir si seguir lanzando.\n";
+                cout << "4. Si un jugador pierde el turno, pierde el progreso en el turno actual.\n";
+                break;
+            case 2:
+                iniciarJuego();
+                break;
+            case 3:
+                cout << "Gracias por jugar!" << endl;
+                break;
+            default:
+                cout << "Opción no válida.\n";
+        }
+    } while (op != 3);
+
+    return 0;
+}
